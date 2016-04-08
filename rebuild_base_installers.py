@@ -53,7 +53,7 @@
 ###########################################################
 # Customize the variables below to your setup / config!
 
-software_update_url = 'http://blackbox.poly.edu/updatesite/'
+software_update_url = 'https://sensibilityclearinghouse.poly.edu/updatesite/'
 public_key_file = '/full/path/to/softwareupdater.publickey'
 private_key_file = '/full/path/to/softwareupdater.privatekey'
 
