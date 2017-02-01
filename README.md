@@ -41,6 +41,13 @@ etc.,
 * and `../RUNNABLE/seattle_linux`, `../RUNNABLE/seattle_mac` and so on 
 have the platform-specific files.
 
-The `rebuild_base_installers` script then copies the generic and 
-platform-specific stuff into base installer directories, and creates the
-actual zip/gz/tar.gz files that the Custom Installer Builder expects.
+Change into `../RUNNABLE`, and adapt `rebuild_base_installers.py` to
+reflect your local installation. This includes the softwareupdater
+cryptographic key pair to use, and the username for whom and the
+destination path into which to package and copy the base installers.
+
+Once configured, run `rebuild_base_installers.py`. This copies the generic
+and  platform-specific stuff into base installer directories, and creates the
+actual base installer zip/gz/tar.gz files that the Custom Installer Builder
+expects. Lastly, copies over the newly-built base installer to the CIB's
+`installers/base` directory.
