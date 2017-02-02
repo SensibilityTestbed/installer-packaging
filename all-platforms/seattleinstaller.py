@@ -2133,13 +2133,6 @@ def main():
     return
 
 
-  # Check if Seattle is already installed. This needs to be done seperately
-  # from setting Seattle to run at startup because installation might fail
-  # during the pre-installation process.
-  if test_seattle_is_installed():
-    _output("Seattle was already installed. You must run the uninstall " \
-              + "script before reinstalling Seattle.")
-    return
 
 
   # Initialize the service logger.
@@ -2176,6 +2169,18 @@ def main():
   #   dictionary.
   continue_install = prepare_installation(opts,args)
   if not continue_install:
+    return
+
+  # Check if Seattle is already installed. This needs to be done seperately
+  # from setting Seattle to run at startup because installation might fail
+  # during the pre-installation process.
+  # However, if we are told to disable the startup script, we do not
+  # need to check for a previous install either. (Perhaps the nodemanager
+  # will complain if another nodemanager is running already, but that's
+  # not an install-time problem then, and is handled/raised in nmmain.)
+  if not DISABLE_STARTUP_SCRIPT and test_seattle_is_installed():
+    _output("Seattle was already installed. You must run the uninstall " \
+              + "script before reinstalling Seattle.")
     return
 
   # Pre-install: run all tests and benchmarking.
