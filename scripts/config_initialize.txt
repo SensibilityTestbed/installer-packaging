@@ -1,4 +1,4 @@
-https://github.com/SensibilityTestbed/nodemanager ../DEPENDENCIES/nodemanager
+https://github.com/SensibilityTestbed/nodemanager ../DEPENDENCIES/nodemanager -b jni
 https://github.com/SensibilityTestbed/softwareupdater ../DEPENDENCIES/softwareupdater
 https://github.com/SeattleTestbed/common ../DEPENDENCIES/common
 https://github.com/SeattleTestbed/portability ../DEPENDENCIES/portability
