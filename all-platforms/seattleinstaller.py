@@ -27,7 +27,7 @@ import os
 import shutil
 import platform
 import sys
-import getopt
+import argparse
 import tempfile
 import time
 import getpass
@@ -1856,37 +1856,19 @@ def test_urandom_implemented():
 
 
 
-def prepare_installation(options,arguments):
+def prepare_installation(options):
   """
   <Purpose>
-    Prepare all necessary global variables and files for the actual installation
-    process.  This includes combing through the arguments passed to the installer
-    to set the appropriate variables and setting the Node Manager configuration
-    information (in nodeman.cfg file).
+    Prepare all necessary global variables for the installation process.
+    Update the nodemanager configuration file, `nodeman.cfg`.
 
   <Arguments>
     options:
-      A list of tuples (flag,value) where flag is the argument name passed to
-      the installer (e.g., --nm-key-bitsize) and value is the value for that
-      particular flag (e.g., 1024).  Example element that could appear in the
-      list described by options: ("--nm-key-bitsize","1024")
-
-    arguments:
-      A list of arguments that did not have an argument name associated with it
-      (e.g., Specifying the install directory. See [install_dir] in usage())
-
-  <Exceptions>
-    IOError if the specified install directory does not exist.
-
-  <Side Effects>
-    Changes default local and global variables, and injects relevant information
-    into the Node Manager configuration file (nodeman.cfg).
-
-  <Return>
-    True if this entire prepare_installation() process finished,
-    False otherwise (meaning an argument was passed that calls for install to be
-    halted [e.g., --usage] or a value for one of the named arguments is
-    unreasonable [e.g., setting the resource percentage to be %0].).
+      A `Namespace` object as returned by `argparse.parse_args`. For every
+      command-line flag, the namespace contains an attribute. For example,
+      if the user specified "--nm-ip 10.0.0.1" on the command line, we can
+      access the value as `options.nm_ip`. Flags not specified default to
+      `None`.
   """
   global SILENT_MODE
   global RESOURCE_PERCENTAGE
@@ -1894,86 +1876,47 @@ def prepare_installation(options,arguments):
   global DISABLE_STARTUP_SCRIPT
   global DISABLE_INSTALL
 
-  # Armon: Specify the variables that will be used to generate the Restrictions
-  # Information for the NM and Repy.
-  repy_restricted = False
-  repy_nootherips = False
-  repy_user_preference = []
-  nm_restricted = False
-  nm_user_preference = []
-  repy_prepend = []
-  repy_prepend_dir = None
+  SILENT_MODE = options.silent
+  RESOURCE_PERCENTAGE = options.percent
+  KEYBITSIZE = options.nm_key_bitsize
+  DISABLE_STARTUP_SCRIPT = options.disable_startup_script
+  DISABLE_INSTALL = options.update_prefs
 
-  # Iterate through and process the arguments, checking for IP/Iface
-  # restrictions.
-  for (flag, value) in options:
-    if flag == "-s":
-      SILENT_MODE = True
-    elif flag == "--onlynetwork":
-      disable_install = True
-    elif flag == "--percent":
-      # Check to see that the desired percentage of system resources is valid
-      # I do not see a reason someone couldn't donate 20.5 percent so it
-      # will be allowed for now.
-      try:
-        RESOURCE_PERCENTAGE = float(value)
-      except ValueError:
-        usage()
-        return False
-      if RESOURCE_PERCENTAGE <= 0.0 or RESOURCE_PERCENTAGE > 100.0:
-        usage()
-        return False
-    elif flag == "--nm-ip":
-      nm_restricted = True
-      nm_user_preference.append((True, value))
-    elif flag == "--nm-iface":
-      nm_restricted = True
-      nm_user_preference.append((False, value))
-    elif flag == "--repy-ip":
-      repy_restricted = True
-      repy_user_preference.append((True, value))
-    elif flag == "--repy-iface":
-      repy_restricted = True
-      repy_user_preference.append((False,value))
-    elif flag == "--repy-nootherips":
-      repy_restricted = True
-      repy_nootherips = True
-    elif flag == "--nm-key-bitsize":
-      KEYBITSIZE = int(value)
-    elif flag == "--disable-startup-script":
-      DISABLE_STARTUP_SCRIPT = True
-    elif flag == "--usage":
-      usage()
-      return False
-    elif flag == "--repy-prepend":
-      repy_prepend.extend(value.split())
-    elif flag == "--repy-prepend-dir":
-      repy_prepend_dir = value
+  # Set up the network restrictions dict
+  networkrestrictions = {
+      "nm_user_preference": [],
+      "repy_user_preference": [],
+  }
 
-  # Print this notification after having processed all the arguments in case one
-  # of the arguments specifies silent mode.
-  if DISABLE_STARTUP_SCRIPT:
-    _output("Seattle will not be configured to run automatically at boot.")
-    
+  # The user preference lists should contain tuples `(IS_IFACE, NAME_OR_ADDR)`
+  # where IS_IFACE=True if NAME_OR_ADDR specifies an interface name, and
+  # False if it's an IP address.
+  for name, value, destination in [
+      ("nm_ip", True, networkrestrictions["nm_user_preference"]),
+      ("nm_iface", False, networkrestrictions["nm_user_preference"]),
+      ("repy_ip", True, networkrestrictions["repy_user_preference"]),
+      ("repy_iface", False, networkrestrictions["repy_user_preference"]), ]:
 
-  # Build the configuration dictionary.
-  config = {}
-  config['nm_restricted'] = nm_restricted
-  config['nm_user_preference'] = nm_user_preference
-  config['repy_restricted'] = repy_restricted
-  config['repy_user_preference'] = repy_user_preference
-  config['repy_nootherips'] = repy_nootherips 
+    # If left unspecified on the commant line, the attribute contains None.
+    # Otherwise it's a list of IP addresses or names.
+    attribute = getattr(options, name)
+    if attribute is not None:
+      destination.extend(zip(attribute, [value] * len(attribute)))
+
+  # If there are nodemanager or Repy network preferences, then set the
+  # "restricted" flags accordingly.
+  networkrestrictions["nm_restricted"] = (len(networkrestrictions["nm_user_preference"]) > 0)
+  networkrestrictions["repy_restricted"] = (len(networkrestrictions["repy_user_preference"]) > 0)
+
+  networkrestrictions["repy_nootherips"] = options.repy_nootherips
+
 
   # Armon: Inject the configuration information.
   configuration = persist.restore_object("nodeman.cfg")
-  configuration['networkrestrictions'] = config
-  configuration['repy_prepend'] = repy_prepend
-  configuration['repy_prepend_dir'] = repy_prepend_dir
+  configuration['networkrestrictions'] = networkrestrictions
+  configuration['repy_prepend'] = (options.repy_prepend or [])
+  configuration['repy_prepend_dir'] = (options.repy_prepend_dir or [])
   persist.commit_object(configuration,"nodeman.cfg")
-
-  # Tell the parent function that the passed-in arguments allow it to continue
-  # with the installation.
-  return True
 
 
 
@@ -2060,56 +2003,6 @@ def test_seattle_is_installed():
 
 
 
-def usage():
-  """
-  Prints command line usage of script.
-  """
-
-  if OS == "Windows" or OS == "WindowsCE":
-    print "install.bat",
-  elif OS == "Linux" or OS == "Darwin":
-    print "install.sh",
-  else:
-    print "python seattleinstaller.py",
-
-  print "[-s] [--usage] " \
-      + "[--disable-startup-script] [--percent float] " \
-      + "[--nm-key-bitsize bitsize] [--nm-ip ip] [--nm-iface iface] " \
-      + "[--repy-ip ip] [--repy-iface iface] [--repy-nootherips] " \
-      + "[--onlynetwork] [--repy-prepend args] [--repy-prepend-dir dir]"
-  print "Info:"
-  print "-s\t\t\t\tSilent mode: does not print output."
-  print "--disable-startup-script\tDoes not install the Seattle startup " \
-      + "script, meaning that Seattle will not automatically start running " \
-      + "at machine start up. It is recommended that this option only be " \
-      + "used in exceptional circumstances."
-  print "--percent percent\t\tSpecifies the desired percentage of available " \
-      + "system resources to donate. Default percentage: " \
-      + str(RESOURCE_PERCENTAGE)
-  print "--nm-key-bitsize bitsize\tSpecifies the desired bitsize of the Node " \
-      + "Manager keys. Default bitsize: " + str(KEYBITSIZE)
-  print "--nm-ip IP\t\t\tSpecifies a preferred IP for the NM. Multiple may " \
-      + "be specified, they will be used in the specified order."
-  print "--nm-iface iface\t\tSpecifies a preferred interface for the NM. " \
-      + "Multiple may be specified, they will be used in the specified order."
-  print "--repy-ip, --repy-iface. See --nm-ip and --nm-iface. These flags " \
-      + "only affect repy and are separate from the Node Manager."
-  print "--repy-nootherips\t\tSpecifies that repy is only allowed to use " \
-      + "explicit IP's and interfaces."
-  print "--onlynetwork\t\t\tDoes not install Seattle, but updates the " \
-      + "network restrictions information."
-  print "--repy-prepend args\t\tSpecifies a list of arguments to be " \
-      + "prepended to any repy program run by the user. If multiple argument " \
-      + "lists are specified, they will be concatenated."
-  print "--repy-prepend-dir dir\t\tSpecifies a directory containing files to " \
-      + "be copied to newly created vessels."
-  print "See https://seattle.cs.washington.edu/wiki/SecurityLayers for " \
-      + "details on using --repy-prepend and --repy-prepend-dir to " \
-      + "construct custom security layers."
-
-
-
-
 def main():
   if OS not in SUPPORTED_OSES:
     raise UnsupportedOSError("This operating system is not supported.")
@@ -2118,39 +2011,49 @@ def main():
   # Begin pre-installation process.
 
   # Pre-install: parse the passed-in arguments.
-  try:
-    # Armon: Changed getopt to accept parameters for Repy and NM IP/Iface
-    # restrictions, also a special disable flag
-    opts, args = getopt.getopt(sys.argv[1:], "s",
-                               ["percent=", "nm-key-bitsize=","nm-ip=",
-                                "nm-iface=","repy-ip=","repy-iface=",
-                                "repy-nootherips","onlynetwork",
-                                "disable-startup-script","usage",
-                                "repy-prepend=", "repy-prepend-dir="])
-  except getopt.GetoptError, err:
-    print str(err)
-    usage()
-    return
+  parser = argparse.ArgumentParser(description="Install Seattle Testbed")
 
+  parser.add_argument("--continue", action="store_true",
+      help="Continue the installation process even if errors are encountered")
+  parser.add_argument("--disable-startup-script", action="store_true",
+      help="Do not install to start up at machine boot")
+  parser.add_argument("--nm-key-bitsize", nargs="?", type=int, default=2048,
+      help="Key length for nodemanager keys")
+  parser.add_argument("--nm-iface", action="append",
+      help="Preferred network interface for nodemanager")
+  parser.add_argument("--nm-ip", action="append",
+      help="Preferred IP address(es) for nodemanager")
+  parser.add_argument("--percent", nargs="?", type=int, choices=xrange(101),
+      default=10, help="Donate this share of machine resources")
+  parser.add_argument("--repy-iface", action="append",
+      help="Preferred network interface for Repy sandboxes")
+  parser.add_argument("--repy-ip", action="append",
+      help="Preferred IP address(es) for Repy sandboxes")
+  parser.add_argument("--repy-nootherips", action="store_true",
+      help="Restrict Repy sandboxes to the preferred IP address(es)")
+  parser.add_argument("--repy-prepend", nargs="*",
+      help="Prepend the following argument(s) to the sandbox start command")
+  parser.add_argument("--repy-prepend-dir",
+      help="Prepopulate sandboxes with the contents of this directory")
+  parser.add_argument("--silent", "-s", action="store_true", help="Silent mode")
+  parser.add_argument("--update-prefs", "--onlynetwork", action="store_true",
+      help="Do not install, only update the nodemanager preferences from the command line arguments")
 
+  options = parser.parse_args()
 
 
   # Initialize the service logger.
   servicelogger.init('installInfo')
 
-  # This catches Nokias/Androids/iPhones/iPads
-  if platform.machine().startswith('armv'):
-    # AR: The Android installer is a GUI, stdout/stderr are redirected to files.
-    try:
-      import android
-      global IS_ANDROID
-      IS_ANDROID = True
-      sys.stdout = open('installerstdout.log', 'w')
-      sys.stderr = open('installerstderr.log', 'w')
-      _output('Seattle is being installed on an Android compatible handset.')
-
-    except ImportError:
-      IS_ANDROID = False
+  try:
+    import android
+    global IS_ANDROID
+    IS_ANDROID = True
+    sys.stdout = open('installerstdout.log', 'w')
+    sys.stderr = open('installerstderr.log', 'w')
+    _output('Seattle is being installed on an Android compatible handset.')
+  except ImportError:
+    pass
 
     # Derek Cheng: if the user is running a Nokia N800 tablet, we require them
     # to be on root first in order to have files created in the /etc/init.d and
@@ -2165,11 +2068,8 @@ def main():
     #              + 'installing/using the rootsh or openssh package.')
     #    return
 
-  # Pre-install: process the passed-in arguments, and set up the configuration
-  #   dictionary.
-  continue_install = prepare_installation(opts,args)
-  if not continue_install:
-    return
+  # Pre-install: process the passed-in arguments.
+  prepare_installation(options)
 
   # Check if Seattle is already installed. This needs to be done seperately
   # from setting Seattle to run at startup because installation might fail
@@ -2266,6 +2166,9 @@ def main():
       servicelogger.log(time.strftime(" seattle was NOT installed on this " \
                                         + "system for the following reason: " \
                                         + str(e) + ". %m-%d-%Y  %H:%M:%S"))
+  else:
+    _output("Seattle will not be configured to run automatically at boot.")
+
 
 
 
