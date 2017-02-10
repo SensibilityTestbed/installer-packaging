@@ -1915,7 +1915,7 @@ def prepare_installation(options):
   configuration = persist.restore_object("nodeman.cfg")
   configuration['networkrestrictions'] = networkrestrictions
   configuration['repy_prepend'] = (options.repy_prepend or [])
-  configuration['repy_prepend_dir'] = (options.repy_prepend_dir or [])
+  configuration['repy_prepend_dir'] = options.repy_prepend_dir
   persist.commit_object(configuration,"nodeman.cfg")
 
 
