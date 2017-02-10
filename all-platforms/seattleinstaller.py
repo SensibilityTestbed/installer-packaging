@@ -1860,15 +1860,15 @@ def prepare_installation(options):
   """
   <Purpose>
     Prepare all necessary global variables for the installation process.
-    Update the nodemanager configuration file, `nodeman.cfg`.
 
   <Arguments>
     options:
       A `Namespace` object as returned by `argparse.parse_args`. For every
       command-line flag, the namespace contains an attribute. For example,
       if the user specified "--nm-ip 10.0.0.1" on the command line, we can
-      access the value as `options.nm_ip`. Flags not specified default to
-      `None`.
+      access the value as `options.nm_ip`. Flags with arguments default to
+      `None` if they are not given on the command line; missing boolean
+      flags default to `False`.
   """
   global SILENT_MODE
   global RESOURCE_PERCENTAGE
@@ -1882,6 +1882,24 @@ def prepare_installation(options):
   DISABLE_STARTUP_SCRIPT = options.disable_startup_script
   DISABLE_INSTALL = options.update_prefs
 
+
+
+def update_nodemanager_config(options):
+  """
+  <Purpose>
+    Update the nodemanager's configuration file, `nodeman.cfg`.
+    (We deal mostly with networking-related flags here, and a few
+    for Security Layers.)
+
+  <Arguments>
+    options:
+      A `Namespace` object as returned by `argparse.parse_args`. For every
+      command-line flag, the namespace contains an attribute. For example,
+      if the user specified "--nm-ip 10.0.0.1" on the command line, we can
+      access the value as `options.nm_ip`. Flags with arguments default to
+      `None` if they are not given on the command line; missing boolean
+      flags default to `False`.
+  """
   # Set up the network restrictions dict
   networkrestrictions = {
       "nm_user_preference": [],
@@ -2068,8 +2086,15 @@ def main():
     #              + 'installing/using the rootsh or openssh package.')
     #    return
 
-  # Pre-install: process the passed-in arguments.
+  # Pre-install: process the passed-in arguments and set up global variables
   prepare_installation(options)
+
+  # Pre-install: update the nodemanager configuration file
+  update_nodemanager_config(options)
+
+  # If all the user wanted was the nodeman.cfg update, exit right here
+  if DISABLE_INSTALL:
+    return
 
   # Check if Seattle is already installed. This needs to be done seperately
   # from setting Seattle to run at startup because installation might fail
@@ -2097,8 +2122,6 @@ def main():
 
 
   # Begin installation.
-  if DISABLE_INSTALL:
-    return
   
   # First, customize any scripts since they may be copied to new locations when
   # configuring seattle to run automatically at boot.
