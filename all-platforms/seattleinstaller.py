@@ -1705,7 +1705,7 @@ def start_seattle():
 
 
 # Anthony Honstain's benchmarking function.
-def perform_system_benchmarking():
+def perform_system_benchmarking(options):
   """
   <Purpose>
     To call benchmark_resources.main (which performs the system 
@@ -1716,7 +1716,12 @@ def perform_system_benchmarking():
     output useful information to the user installing seattle. 
 
   <Arguments>
-    None
+    options: A `Namespace` object as returned from argparse.parse_args.
+      This might contain overrides for benchmarked values that the
+      user supplied on the command line, e.g. "--diskused 100000000".
+      This allows for more fine-grained control over donations, and
+      lets us work around problems with system tools that are hard
+      to fix otherwise, e.g. Android's inconsistent `df` versions.
 
   <Exceptions>
     IOError if unable to create a log file.
@@ -1752,7 +1757,7 @@ def perform_system_benchmarking():
     
   try:
     benchmark_resources.main(SEATTLE_FILES_DIR, RESOURCE_PERCENTAGE,
-                             benchmark_logfileobj)
+                             benchmark_logfileobj, options)
   except benchmark_resources.BenchmarkingFailureError:
     _output("Installation terminated.")
     _output("Please email the Seattle project for additional support, and " \
@@ -2057,6 +2062,39 @@ def main():
   parser.add_argument("--update-prefs", "--onlynetwork", action="store_true",
       help="Do not install, only update the nodemanager preferences from the command line arguments")
 
+  # Add flags for overriding benchmarked resource values
+  overrides = parser.add_argument_group("Benchmarked resource overrides",
+      description="Use these flags to override the measured values for this machine's resources. (Note that your overrides are subject to the chosen --percent and number of vessels to be created.)")
+  overrides.add_argument("--cpu", type=float,
+      help="Share of CPU. 1 means the whole CPU (all cores, threads, etc.).")
+      # XXX Is this true? Check core count against the benchmark script!!!
+  overrides.add_argument("--diskused", type=int, help="Disk space in bytes")
+  overrides.add_argument("--events", type=int, help="Number of threads")
+  overrides.add_argument("--fileread", type=int,
+      help="File read rate in bytes per second")
+  overrides.add_argument("--filesopened", type=int, help="Number of open files")
+  overrides.add_argument("--filewrite", type=int,
+      help="File write rate in bytes per second")
+  overrides.add_argument("--insockets", type=int,
+      help="Number of open server sockets")
+  overrides.add_argument("--lograte", type=int,
+      help="Log rate in bytes per second")
+  overrides.add_argument("--looprecv", type=int,
+      help="Loopback receive rate in bytes per second")
+  overrides.add_argument("--loopsend", type=int,
+      help="Loopback send rate in bytes per second")
+  overrides.add_argument("--memory", type=int, help="Memory in bytes")
+  overrides.add_argument("--netrecv", type=int,
+      help="Network receive rate in bytes per second")
+  overrides.add_argument("--netsend", type=int,
+      help="Network send rate in bytes per second")
+  overrides.add_argument("--outsockets", type=int,
+      help="Number of outgoing network connections")
+  overrides.add_argument("--random", type=int,
+      help="Randomness read rate in bytes per second")
+
+
+  # Finally, parse the args!
   options = parser.parse_args()
 
 
@@ -2115,7 +2153,7 @@ def main():
   urandom_test_succeeded = test_urandom_implemented()
   if not urandom_test_succeeded:
     return
-  benchmarking_succeeded = perform_system_benchmarking()
+  benchmarking_succeeded = perform_system_benchmarking(options)
   if not benchmarking_succeeded:
     return
 
