@@ -2,7 +2,7 @@ https://github.com/SensibilityTestbed/nodemanager ../DEPENDENCIES/nodemanager -b
 https://github.com/SensibilityTestbed/softwareupdater ../DEPENDENCIES/softwareupdater
 https://github.com/SeattleTestbed/common ../DEPENDENCIES/common
 https://github.com/SeattleTestbed/portability ../DEPENDENCIES/portability
-https://github.com/SensibilityTestbed/repy_v2 ../DEPENDENCIES/repy_v2 -b jni-sensors
+https://github.com/SensibilityTestbed/repy_v2 ../DEPENDENCIES/repy_v2 -b add-sensorlock
 https://github.com/SensibilityTestbed/seattlelib_v2 ../DEPENDENCIES/seattlelib_v2
 https://github.com/SeattleTestbed/affix ../DEPENDENCIES/affix
 https://github.com/SensibilityTestbed/resource ../DEPENDENCIES/resource
